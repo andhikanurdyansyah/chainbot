@@ -12,7 +12,7 @@
 
 import { EventEmitter } from 'events';
 import { chromium } from 'playwright';
-import { appendFileSync, existsSync } from 'fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { MimoRegistration } from '../core/registration.js';
 import { generateFingerprint, buildInitScript, buildExtraHeaders } from '../browser/fingerprint.js';
@@ -98,6 +98,9 @@ class ChainRunner extends EventEmitter {
 
     this._running = false;
 
+    // Recalculate all balances with referral bonuses
+    this._recalculateBalances();
+
     if (this._aborted) {
       this.emit('stopped', { okCount, failCount, results });
     } else {
@@ -118,7 +121,7 @@ class ChainRunner extends EventEmitter {
       `https://platform.xiaomimimo.com/?ref=${encodeURIComponent(currentRef)}`;
 
     const reg = new MimoRegistration(iterConfig);
-    let refCode = null, apiKey = null;
+    let refCode = null, apiKey = null, balance = null;
     let currentProxy = null;
 
     try {
@@ -193,9 +196,32 @@ class ChainRunner extends EventEmitter {
         }
       } catch (e) {}
 
-      this._saveResult({ email: account.email, password: account.password, refCode, apiKey, invitedBy: currentRef });
+      // Read final balance
+      try {
+        // Navigate to balance page if not already there
+        if (!reg.page.url().includes('/console/balance')) {
+          await reg.page.goto('https://platform.xiaomimimo.com/console/balance', {
+            waitUntil: 'networkidle', timeout: iterConfig.browser.timeout,
+          }).catch(() => {});
+          await reg.page.waitForTimeout(3000);
+        }
+        balance = await reg.readBalance();
+        if (balance !== null) {
+          this.emit('log', `💰 Final balance: $${balance.toFixed(2)}`);
+        }
+      } catch (e) {}
 
-      const result = { ok: true, idx, total, email: account.email, refCode, apiKey };
+      this._saveResult({
+        email: account.email,
+        password: account.password,
+        mimoPassword: reg._mimoPassword || '',
+        refCode,
+        apiKey,
+        balance,
+        invitedBy: currentRef,
+      });
+
+      const result = { ok: true, idx, total, email: account.email, refCode, apiKey, balance, mimoPassword: reg._mimoPassword };
       this.emit('progress', result);
       return result;
 
@@ -219,11 +245,87 @@ class ChainRunner extends EventEmitter {
   }
 
   _saveResult(row) {
-    const line = [row.email, row.password, row.refCode || '', row.apiKey || '', row.invitedBy || ''].join(':') + '\n';
+    // Schema: email:googlePassword:mimoPassword:refCode:apiKey:balance:refBonus:totalBalance:invitedBy
+    // refBonus and totalBalance are placeholders — recalculated at end of chain
+    const line = [
+      row.email,
+      row.password,
+      row.mimoPassword || '',
+      row.refCode || '',
+      row.apiKey || '',
+      row.balance !== null && row.balance !== undefined ? row.balance.toFixed(2) : '',
+      '0.00', // refBonus placeholder
+      row.balance !== null && row.balance !== undefined ? row.balance.toFixed(2) : '0.00', // totalBalance placeholder
+      row.invitedBy || '',
+    ].join(':') + '\n';
     if (!existsSync(this.outputFile)) {
-      appendFileSync(this.outputFile, '# Chain loop results. Format: email:password:refCode:apiKey:invitedBy\n', 'utf8');
+      appendFileSync(this.outputFile, '# email:googlePassword:mimoPassword:refCode:apiKey:balance:refBonus:totalBalance:invitedBy\n', 'utf8');
     }
     appendFileSync(this.outputFile, line, 'utf8');
+  }
+
+  _recalculateBalances() {
+    if (!existsSync(this.outputFile)) return;
+
+    const content = readFileSync(this.outputFile, 'utf8');
+    const lines = content.split(/\r?\n/);
+    const headerLines = [];
+    const dataRows = [];
+
+    for (const line of lines) {
+      if (!line.trim() || line.startsWith('#')) {
+        headerLines.push(line);
+        continue;
+      }
+      const parts = line.split(':');
+      if (parts.length < 9) continue;
+      dataRows.push({
+        email: parts[0],
+        password: parts[1],
+        mimoPassword: parts[2],
+        refCode: parts[3],
+        apiKey: parts[4],
+        balance: parseFloat(parts[5]) || 0,
+        refBonus: 0,
+        totalBalance: 0,
+        invitedBy: parts[8],
+      });
+    }
+
+    // Count how many times each refCode is used as invitedBy
+    const refUsage = {};
+    for (const row of dataRows) {
+      const invitedBy = row.invitedBy;
+      if (invitedBy) {
+        refUsage[invitedBy] = (refUsage[invitedBy] || 0) + 1;
+      }
+    }
+
+    // Recalculate refBonus and totalBalance
+    for (const row of dataRows) {
+      const usageCount = row.refCode ? (refUsage[row.refCode] || 0) : 0;
+      row.refBonus = usageCount * 2.00;
+      row.totalBalance = row.balance + row.refBonus;
+    }
+
+    // Rewrite file
+    const newLines = [
+      ...headerLines,
+      ...dataRows.map(r => [
+        r.email,
+        r.password,
+        r.mimoPassword,
+        r.refCode,
+        r.apiKey,
+        r.balance.toFixed(2),
+        r.refBonus.toFixed(2),
+        r.totalBalance.toFixed(2),
+        r.invitedBy,
+      ].join(':')),
+    ];
+
+    writeFileSync(this.outputFile, newLines.join('\n') + '\n', 'utf8');
+    this.emit('log', '📊 Balances recalculated with referral bonuses');
   }
 
   _logFailed(email, error) {
