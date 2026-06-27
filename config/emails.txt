@@ -1,12 +1,13 @@
 # Google Account List — format: email:password (one per line)
 # Lines starting with # are ignored
 #
-sampe.fadel.brutu3@mangacin.com:@Andhika#1
-sampe.fadel.brutu4@mangacin.com:@Andhika#1
-sampe.fadel.brutu5@mangacin.com:@Andhika#1
-sampe.fadel.brutu6@mangacin.com:@Andhika#1
-sampe.fadel.brutu7@mangacin.com:@Andhika#1
-sampe.fadel.brutu8@mangacin.com:@Andhika#1
-sampe.fadel.brutu9@mangacin.com:@Andhika#1
-sampe.fadel.brutu10@mangacin.com:@Andhika#1
-
+bakijan.hafshah.daud1@satukataku.com:@Andhika#1
+bakijan.hafshah.daud2@satukataku.com:@Andhika#1
+bakijan.hafshah.daud3@satukataku.com:@Andhika#1
+bakijan.hafshah.daud4@satukataku.com:@Andhika#1
+bakijan.hafshah.daud5@satukataku.com:@Andhika#1
+bakijan.hafshah.daud6@satukataku.com:@Andhika#1
+bakijan.hafshah.daud7@satukataku.com:@Andhika#1
+bakijan.hafshah.daud8@satukataku.com:@Andhika#1
+bakijan.hafshah.daud9@satukataku.com:@Andhika#1
+bakijan.hafshah.daud10@satukataku.com:@Andhika#1

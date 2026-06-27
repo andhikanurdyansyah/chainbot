@@ -173,9 +173,12 @@ class ChainRunner extends EventEmitter {
       await reg.googleSignIn(account);
       await reg.xiaomiOnboard();
 
-      // Post-registration
+      // Post-registration — ACCOUNT_RESTRICTED / BALANCE_NOT_CREDITED are
+      // non-blocking: log warning and continue to API key, ultraspeed, etc.
       try { await reg.redeemInviteCode(); } catch (e) {
-        if (e.code === 'ACCOUNT_RESTRICTED' || e.code === 'BALANCE_NOT_CREDITED') throw e;
+        if (e.code === 'ACCOUNT_RESTRICTED' || e.code === 'BALANCE_NOT_CREDITED') {
+          this.emit('log', `⚠ ${e.code}: ${e.message?.substring(0, 80)} — skipping redeem, continuing...`);
+        }
       }
 
       try { apiKey = await reg.createApiKey(); } catch (e) {}
