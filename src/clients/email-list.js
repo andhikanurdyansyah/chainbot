@@ -11,7 +11,7 @@
  * Auto-skips emails already present in chain-result.txt (dedup).
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 class EmailList {
   constructor(filePath, resultFilePath) {
@@ -63,12 +63,36 @@ class EmailList {
     const removed = before - this.accounts.length;
 
     if (removed > 0) {
-      console.log(`[EmailList] Skipped ${removed} already-registered emails (in result file)`);
+      this._writeBack();
+      console.log(`[EmailList] Removed ${removed} already-registered emails from ${this._filePath}`);
     }
 
     if (this.accounts.length === 0) {
       throw new Error(`EmailList: all ${before} accounts already registered. Add fresh emails to ${this._filePath}`);
     }
+  }
+
+  _writeBack() {
+    const raw = readFileSync(this._filePath, 'utf8');
+    const lines = raw.split(/\r?\n/);
+    const freshEmails = new Set(this.accounts.map(a => a.email.toLowerCase()));
+    const kept = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) {
+        kept.push(line);
+        continue;
+      }
+      const sepIdx = trimmed.indexOf(':');
+      if (sepIdx === -1) continue;
+      const email = trimmed.substring(0, sepIdx).trim().toLowerCase();
+      if (freshEmails.has(email)) {
+        kept.push(line);
+      }
+    }
+
+    writeFileSync(this._filePath, kept.join('\n') + '\n', 'utf8');
   }
 
   getNext() {
