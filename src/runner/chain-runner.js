@@ -278,15 +278,25 @@ class ChainRunner extends EventEmitter {
       }
       const parts = line.split(':');
       if (parts.length < 7) continue;
-      dataRows.push({
-        email: parts[0],
-        password: parts[1],
-        mimoPassword: parts[2],
-        refCode: parts[3],
-        apiKey: parts[4],
-        balance: parseFloat(parts[5]) || 0,
-        invitedBy: parts[6],
-      });
+
+      // Handle both old 9-field and new 7-field format
+      if (parts.length >= 9) {
+        // Old: email:pw:mimoPw:ref:key:balance:refBonus:totalBal:invitedBy
+        dataRows.push({
+          email: parts[0], password: parts[1], mimoPassword: parts[2],
+          refCode: parts[3], apiKey: parts[4],
+          balance: parseFloat(parts[5]) || 0,
+          invitedBy: parts[8],
+        });
+      } else {
+        // New: email:pw:mimoPw:ref:key:totalBalance:invitedBy
+        dataRows.push({
+          email: parts[0], password: parts[1], mimoPassword: parts[2],
+          refCode: parts[3], apiKey: parts[4],
+          balance: parseFloat(parts[5]) || 0,
+          invitedBy: parts[6],
+        });
+      }
     }
 
     const refUsage = {};
