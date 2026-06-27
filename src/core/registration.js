@@ -271,61 +271,106 @@ class MimoRegistration {
     // Step 2: Click "Sign in with Google"
     console.log('  Clicking "Sign in with Google"...');
     let authPage = null;
+
+    // Broader selectors — Xiaomi renders this as different element types
     const googleSelectors = [
       'button:has-text("Sign in with Google")',
-      'a:has-text("Sign in with Google")',
-      '[class*="google"]',
       'button:has-text("Google")',
+      'a:has-text("Sign in with Google")',
+      'a:has-text("Google")',
+      '[class*="google" i]:visible',
+      '[class*="Google" i]:visible',
+      '[data-provider="google"]',
+      '[aria-label*="Google" i]',
+      'img[alt*="Google" i] >> ..',
+      'img[src*="google"] >> ..',
     ];
 
     let googleClicked = false;
-    for (const sel of googleSelectors) {
-      try {
-        const el = this.page.locator(sel).first();
-        if (await el.count() > 0 && await el.isVisible({ timeout: 2000 }).catch(() => false)) {
-          // Try popup first, then fallback to same-page redirect
+
+    // Retry up to 3 times — page might still be loading
+    for (let attempt = 0; attempt < 3 && !googleClicked; attempt++) {
+      if (attempt > 0) {
+        console.log(`  Retry ${attempt}/3 finding Google button...`);
+        await this.page.waitForTimeout(3000);
+      }
+
+      for (const sel of googleSelectors) {
+        if (googleClicked) break;
+        try {
+          const el = this.page.locator(sel).first();
+          if (await el.count() > 0 && await el.isVisible({ timeout: 3000 }).catch(() => false)) {
+            try {
+              const [popup] = await Promise.all([
+                this.page.waitForEvent('popup', { timeout: 8000 }),
+                el.click({ timeout: 5000 }),
+              ]);
+              authPage = popup;
+              console.log('  ✓ Google sign-in opened in popup');
+            } catch (popupErr) {
+              authPage = this.page;
+              console.log('  ✓ Google sign-in redirected (same page)');
+            }
+            googleClicked = true;
+            break;
+          }
+        } catch (e) {}
+      }
+
+      // DOM eval fallback — broader search
+      if (!googleClicked) {
+        const clicked = await this.page.evaluate(() => {
+          const all = Array.from(document.querySelectorAll('button, a, div, span, img'));
+          const target = all.find(el => {
+            const txt = (el.textContent || '').toLowerCase();
+            const alt = (el.alt || '').toLowerCase();
+            const cls = (el.className || '').toLowerCase();
+            const src = (el.src || '').toLowerCase();
+            return (txt.includes('sign in with google') || txt.includes('login with google') ||
+                    txt.includes('google') && (cls.includes('google') || src.includes('google')) ||
+                    alt.includes('google')) && el.offsetHeight > 0;
+          });
+          if (target) {
+            // Click the clickable parent if it's an img
+            const clickTarget = target.closest('button, a, [role="button"]') || target;
+            clickTarget.click();
+            return true;
+          }
+          return false;
+        }).catch(() => false);
+
+        if (clicked) {
+          console.log('  ✓ Clicked Google button (DOM eval)');
+          await this.page.waitForTimeout(3000);
           try {
-            const [popup] = await Promise.all([
-              this.page.waitForEvent('popup', { timeout: 8000 }),
-              el.click({ timeout: 5000 }),
-            ]);
-            authPage = popup;
-            console.log('  ✓ Google sign-in opened in popup');
-          } catch (popupErr) {
-            // No popup — redirect happened on same page
+            const pages = this.page.context().pages();
+            authPage = pages.length > 1 ? pages[pages.length - 1] : this.page;
+          } catch (e) {
             authPage = this.page;
-            console.log('  ✓ Google sign-in redirected (same page)');
           }
           googleClicked = true;
-          break;
         }
-      } catch (e) {}
+      }
     }
 
     if (!googleClicked) {
-      // DOM eval fallback
-      const clicked = await this.page.evaluate(() => {
-        const all = Array.from(document.querySelectorAll('button, a, div, span'));
-        const target = all.find(el => {
-          const txt = (el.textContent || '').toLowerCase();
-          return txt.includes('sign in with google') && el.offsetHeight > 0;
+      // Debug: dump page content to help diagnose
+      try {
+        const debug = await this.page.evaluate(() => {
+          const all = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+          return all.filter(el => el.offsetHeight > 0).map(el => ({
+            tag: el.tagName,
+            text: (el.textContent || '').trim().substring(0, 50),
+            cls: (el.className || '').substring(0, 50),
+            href: el.href || '',
+          }));
+        }).catch(() => []);
+        console.log(`  [Debug] Visible buttons on page (${debug.length}):`);
+        debug.slice(0, 15).forEach(el => {
+          console.log(`    <${el.tag}> cls="${el.cls}" text="${el.text}" href="${el.href?.substring(0, 60)}"`);
         });
-        if (target) { target.click(); return true; }
-        return false;
-      });
-      if (clicked) {
-        console.log('  ✓ Clicked Google button (DOM eval)');
-        await this.page.waitForTimeout(3000);
-        // Check if a popup opened
-        try {
-          const pages = this.page.context().pages();
-          authPage = pages.length > 1 ? pages[pages.length - 1] : this.page;
-        } catch (e) {
-          authPage = this.page;
-        }
-      } else {
-        throw new Error('"Sign in with Google" button not found');
-      }
+      } catch (e) {}
+      throw new Error('"Sign in with Google" button not found');
     }
 
     if (!authPage) authPage = this.page;
@@ -471,8 +516,16 @@ class MimoRegistration {
           const cbs = document.querySelectorAll('input[type="checkbox"]');
           for (const cb of cbs) {
             if (!cb.checked && cb.offsetHeight > 0) {
-              const label = cb.closest('label') || cb.parentElement;
-              if (label) { label.click(); } else { cb.click(); }
+              // Try multiple click targets for reliability
+              cb.click();
+              cb.checked = true;
+              cb.dispatchEvent(new Event('change', { bubbles: true }));
+              cb.dispatchEvent(new Event('input', { bubbles: true }));
+              // Also click parent label/wrapper
+              const label = cb.closest('label');
+              if (label) label.click();
+              const wrapper = cb.closest('[role="checkbox"]');
+              if (wrapper) wrapper.click();
               return true;
             }
           }
@@ -480,7 +533,7 @@ class MimoRegistration {
         });
         if (hasUncheckedBox) {
           console.log('  ✓ Checked checkbox on Google page');
-          await activePage.waitForTimeout(1500);
+          await activePage.waitForTimeout(2000);
         }
       } catch (e) {
         console.log(`  ! Checkbox eval error: ${e.message?.substring(0, 60)}`);

@@ -1,8 +1,6 @@
 # Google Account List — format: email:password (one per line)
 # Lines starting with # are ignored
 #
-bakijan.hafshah.daud6@satukataku.com:@Andhika#1
-bakijan.hafshah.daud7@satukataku.com:@Andhika#1
 bakijan.hafshah.daud8@satukataku.com:@Andhika#1
 bakijan.hafshah.daud9@satukataku.com:@Andhika#1
 bakijan.hafshah.daud10@satukataku.com:@Andhika#1
@@ -21,4 +19,5 @@ bakijan.hafshah.daud22@satukataku.com:@Andhika#1
 bakijan.hafshah.daud23@satukataku.com:@Andhika#1
 bakijan.hafshah.daud24@satukataku.com:@Andhika#1
 bakijan.hafshah.daud25@satukataku.com:@Andhika#1
+
 
