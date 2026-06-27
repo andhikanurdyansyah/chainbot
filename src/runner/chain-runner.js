@@ -245,21 +245,20 @@ class ChainRunner extends EventEmitter {
   }
 
   _saveResult(row) {
-    // Schema: email:googlePassword:mimoPassword:refCode:apiKey:balance:refBonus:totalBalance:invitedBy
-    // refBonus and totalBalance are placeholders — recalculated at end of chain
+    // Schema: email:googlePassword:mimoPassword:refCode:apiKey:totalBalance:invitedBy
+    // totalBalance is placeholder — recalculated at end of chain
+    const bal = row.balance !== null && row.balance !== undefined ? row.balance.toFixed(2) : '0.00';
     const line = [
       row.email,
       row.password,
       row.mimoPassword || '',
       row.refCode || '',
       row.apiKey || '',
-      row.balance !== null && row.balance !== undefined ? row.balance.toFixed(2) : '',
-      '0.00', // refBonus placeholder
-      row.balance !== null && row.balance !== undefined ? row.balance.toFixed(2) : '0.00', // totalBalance placeholder
+      bal,
       row.invitedBy || '',
     ].join(':') + '\n';
     if (!existsSync(this.outputFile)) {
-      appendFileSync(this.outputFile, '# email:googlePassword:mimoPassword:refCode:apiKey:balance:refBonus:totalBalance:invitedBy\n', 'utf8');
+      appendFileSync(this.outputFile, '# email:googlePassword:mimoPassword:refCode:apiKey:totalBalance:invitedBy\n', 'utf8');
     }
     appendFileSync(this.outputFile, line, 'utf8');
   }
@@ -278,7 +277,7 @@ class ChainRunner extends EventEmitter {
         continue;
       }
       const parts = line.split(':');
-      if (parts.length < 9) continue;
+      if (parts.length < 7) continue;
       dataRows.push({
         email: parts[0],
         password: parts[1],
@@ -286,41 +285,25 @@ class ChainRunner extends EventEmitter {
         refCode: parts[3],
         apiKey: parts[4],
         balance: parseFloat(parts[5]) || 0,
-        refBonus: 0,
-        totalBalance: 0,
-        invitedBy: parts[8],
+        invitedBy: parts[6],
       });
     }
 
-    // Count how many times each refCode is used as invitedBy
     const refUsage = {};
     for (const row of dataRows) {
-      const invitedBy = row.invitedBy;
-      if (invitedBy) {
-        refUsage[invitedBy] = (refUsage[invitedBy] || 0) + 1;
-      }
+      if (row.invitedBy) refUsage[row.invitedBy] = (refUsage[row.invitedBy] || 0) + 1;
     }
 
-    // Recalculate refBonus and totalBalance
     for (const row of dataRows) {
-      const usageCount = row.refCode ? (refUsage[row.refCode] || 0) : 0;
-      row.refBonus = usageCount * 2.00;
-      row.totalBalance = row.balance + row.refBonus;
+      const bonus = row.refCode ? (refUsage[row.refCode] || 0) * 2.00 : 0;
+      row.totalBalance = row.balance + bonus;
     }
 
-    // Rewrite file
     const newLines = [
       ...headerLines,
       ...dataRows.map(r => [
-        r.email,
-        r.password,
-        r.mimoPassword,
-        r.refCode,
-        r.apiKey,
-        r.balance.toFixed(2),
-        r.refBonus.toFixed(2),
-        r.totalBalance.toFixed(2),
-        r.invitedBy,
+        r.email, r.password, r.mimoPassword, r.refCode, r.apiKey,
+        r.totalBalance.toFixed(2), r.invitedBy,
       ].join(':')),
     ];
 
