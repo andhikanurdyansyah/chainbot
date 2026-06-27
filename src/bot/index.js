@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { ProxyManager } from '../browser/proxy.js';
 import { ChainRunner } from '../runner/chain-runner.js';
+import { EmailList } from '../clients/email-list.js';
 import { adminOnly } from './admin.js';
 import {
   startCommand, chainCommand, chainStartAction, stopCommand, stopConfirmAction, setRunner,
@@ -24,7 +25,7 @@ import {
   handleProxyText, setProxyManager,
 } from './commands/proxy.js';
 import {
-  configShowCommand, configEditRefAction, configEditPassAction, configEditApiKeyAction,
+  configShowCommand, configEditRefAction, configEditApiKeyAction,
   configToggleProxyAction, configToggleHeadlessAction, handleConfigText, setConfig,
 } from './commands/config.js';
 import { exportCommand, setOutputDir } from './commands/export.js';
@@ -47,6 +48,16 @@ function saveConfig() {
 
 const outputDir = process.env.HERMES_BOT_MIMO_CWD || join(__dirname, '..', '..', 'output');
 
+// ---- Email List -------------------------------------------------------
+
+const emailListPath = config.emailList?.filePath
+  ? join(__dirname, '..', '..', config.emailList.filePath)
+  : join(__dirname, '..', '..', 'config', 'emails.txt');
+
+const resultFilePath = join(outputDir, 'chain-result.txt');
+const emailList = new EmailList(emailListPath, resultFilePath);
+
+// ---- Proxy Manager ----------------------------------------------------
 const proxyConfig = config.proxy || { enabled: false };
 const proxyManager = proxyConfig.enabled && proxyConfig.proxyList?.length > 0
   ? new ProxyManager(proxyConfig.proxyList, {
@@ -56,7 +67,7 @@ const proxyManager = proxyConfig.enabled && proxyConfig.proxyList?.length > 0
     })
   : null;
 
-const runner = new ChainRunner(config, proxyManager, outputDir);
+const runner = new ChainRunner(config, proxyManager, outputDir, emailList);
 
 // Set global references di command modules
 setRunner(runner);
@@ -106,7 +117,6 @@ bot.action(/^proxy_del_(\d+)$/, (ctx) => proxyDelAction(ctx, config));
 
 bot.action(/^config_menu$/, configShowCommand);
 bot.action(/^config_edit_ref$/, configEditRefAction);
-bot.action(/^config_edit_pass$/, configEditPassAction);
 bot.action(/^config_edit_apikey$/, configEditApiKeyAction);
 bot.action(/^config_toggle_proxy$/, (ctx) => configToggleProxyAction(ctx, proxyManager));
 bot.action(/^config_toggle_headless$/, configToggleHeadlessAction);

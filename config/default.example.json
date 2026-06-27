@@ -1,15 +1,10 @@
 {
-  "tempmail": {
-    "apiUrl": "https://mail.yourdomain.com/api"
-  },
-  "captcha": {
-    "provider": "2captcha",
-    "apiKey": "YOUR_2CAPTCHA_API_KEY"
+  "emailList": {
+    "filePath": "config/emails.txt"
   },
   "xiaomi": {
     "referralLink": "https://platform.xiaomimimo.com/?ref=XXXXXX",
     "inviteCode": "XXXXXX",
-    "password": "YourPasswordHere",
     "betaApplication": "MiMo-V2.5-Pro-UltraSpeed"
   },
   "telegram": {

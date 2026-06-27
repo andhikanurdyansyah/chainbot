@@ -21,13 +21,12 @@ async function cleanReply(ctx, text, markup) {
 function configShowCommand(ctx) {
   const x = config.xiaomi;
   const c = config.captcha;
-  const t = config.tempmail;
+  const el = config.emailList;
   return cleanReply(ctx,
     `⚙ *Configuration*\n\n` +
-    `📧 *Tempmail*: \`${t.apiUrl}\`\n` +
-    `🔑 *2Captcha*: ...\`${(c.apiKey || '').slice(-6)}\`\n` +
+    `📧 *Email List*: \`${el?.filePath || 'config/emails.txt'}\`\n` +
+    `🔑 *2Captcha*: ...\`${(c?.apiKey || '').slice(-6)}\`\n` +
     `🔗 *Ref Code*: \`${x.inviteCode}\`\n` +
-    `🔐 *Password*: \`${'*'.repeat(x.password.length)}\`\n` +
     `🖥 *Headless*: ${config.browser.headless ? '✅ on' : '❌ off'}\n` +
     `🔌 *Proxy*: ${config.proxy.enabled ? '✅ on' : '❌ off'} (${(config.proxy.proxyList || []).length} in pool)`,
     configMenu(config)
@@ -39,11 +38,6 @@ function configShowCommand(ctx) {
 async function configEditRefAction(ctx) {
   await cleanReply(ctx, '✏ *Edit Referral Code*\n\nKirim kode baru (6 karakter):\nContoh: `ABC123`', configBack());
   config._editing = { chatId: ctx.chat.id, field: 'ref' };
-}
-
-async function configEditPassAction(ctx) {
-  await cleanReply(ctx, '✏ *Edit Password*\n\nKirim password baru:', configBack());
-  config._editing = { chatId: ctx.chat.id, field: 'password' };
 }
 
 async function configEditApiKeyAction(ctx) {
@@ -68,12 +62,6 @@ async function handleConfigText(ctx) {
       config.xiaomi.referralLink = `https://platform.xiaomimimo.com/?ref=${text.toUpperCase()}`;
       _save();
       return ctx.reply(`✅ Referral code updated: \`${text.toUpperCase()}\``, { parse_mode: 'Markdown', ...configMenu(config) });
-
-    case 'password':
-      if (text.length < 6) return ctx.reply('❌ Too short (min 6).', configBack());
-      config.xiaomi.password = text;
-      _save();
-      return ctx.reply(`✅ Password updated: \`${'*'.repeat(text.length)}\``, { parse_mode: 'Markdown', ...configMenu(config) });
 
     case 'apikey':
       if (text.length < 20) return ctx.reply('❌ Invalid format.', configBack());
@@ -120,4 +108,4 @@ async function configToggleHeadlessAction(ctx) {
   await cleanReply(ctx, `🖥 *Headless:* ${status}`, configMenu(config));
 }
 
-export { setConfig, configShowCommand, configEditRefAction, configEditPassAction, configEditApiKeyAction, configToggleProxyAction, configToggleHeadlessAction, handleConfigText };
+export { setConfig, configShowCommand, configEditRefAction, configEditApiKeyAction, configToggleProxyAction, configToggleHeadlessAction, handleConfigText };

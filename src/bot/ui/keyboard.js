@@ -108,8 +108,7 @@ function configMenu(config) {
   const headless = config.browser?.headless !== false;
   return Markup.inlineKeyboard([
     [Markup.button.callback(`✏ Ref: ${x.inviteCode}`, 'config_edit_ref')],
-    [Markup.button.callback(`✏ Pass: ${'*'.repeat(x.password.length)}`, 'config_edit_pass')],
-    [Markup.button.callback(`✏ API Key: ...${(config.captcha.apiKey || '').slice(-4)}`, 'config_edit_apikey')],
+    [Markup.button.callback(`✏ API Key: ...${(config.captcha?.apiKey || '').slice(-4)}`, 'config_edit_apikey')],
     [
       Markup.button.callback(`${proxyEnabled ? '🟢' : '🔴'} Proxy: ${proxyEnabled ? 'ON' : 'OFF'}`, 'config_toggle_proxy'),
       Markup.button.callback(`${headless ? '🟢' : '🔴'} Headless: ${headless ? 'ON' : 'OFF'}`, 'config_toggle_headless'),

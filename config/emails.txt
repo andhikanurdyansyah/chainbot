@@ -1,0 +1,18 @@
+# Google Account List — format: email:password (one per line)
+# Lines starting with # are ignored
+#
+# These are Google account credentials used for Xiaomi MiMo
+# "Sign in with Google" registration flow.
+#
+# Example:
+# yourname1@gmail.com:YourGooglePassword1
+# yourname2@gmail.com:YourGooglePassword2
+#sampe.fadel.brutu2@mangacin.com:@Andhika#1
+#sampe.fadel.brutu3@mangacin.com:@Andhika#1
+sampe.fadel.brutu4@mangacin.com:@Andhika#1
+sampe.fadel.brutu5@mangacin.com:@Andhika#1
+#sampe.fadel.brutu6@mangacin.com:@Andhika#1
+sampe.fadel.brutu7@mangacin.com:@Andhika#1
+sampe.fadel.brutu8@mangacin.com:@Andhika#1
+sampe.fadel.brutu9@mangacin.com:@Andhika#1
+sampe.fadel.brutu10@mangacin.com:@Andhika#1

@@ -16,14 +16,16 @@ import { appendFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { MimoRegistration } from '../core/registration.js';
 import { generateFingerprint, buildInitScript, buildExtraHeaders } from '../browser/fingerprint.js';
+import { EmailList } from '../clients/email-list.js';
 
 const PROXY_ERROR_PATTERN = /ERR_TUNNEL|ERR_PROXY|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|socket hang|timeout|NS_ERROR/i;
 
 class ChainRunner extends EventEmitter {
-  constructor(config, proxyManager, outputDir) {
+  constructor(config, proxyManager, outputDir, emailList) {
     super();
     this.config = config;
     this.proxyManager = proxyManager;
+    this.emailList = emailList;
     this.outputDir = outputDir || join(import.meta.dirname || '.', '..', '..', 'output');
     this.outputFile = join(this.outputDir, 'chain-result.txt');
     this.failLog = join(this.outputDir, 'chain-fail.log');
@@ -42,6 +44,19 @@ class ChainRunner extends EventEmitter {
     if (this._running) {
       this.emit('log', '⚠ Chain is already running');
       return;
+    }
+
+    // Limit count to available emails
+    if (this.emailList) {
+      const available = this.emailList.remaining;
+      if (available <= 0) {
+        this.emit('log', '❌ No emails remaining in list');
+        return;
+      }
+      if (count > available) {
+        this.emit('log', `⚠ Requested ${count} but only ${available} emails remaining. Limiting.`);
+        count = available;
+      }
     }
 
     this._aborted = false;
@@ -91,18 +106,22 @@ class ChainRunner extends EventEmitter {
   }
 
   async _runIteration(idx, total, currentRef) {
+    // Get next account from email list
+    if (!this.emailList || this.emailList.remaining <= 0) {
+      return { ok: false, idx, total, email: null, error: 'No emails remaining' };
+    }
+    const account = this.emailList.getNext();
+
     const iterConfig = JSON.parse(JSON.stringify(this.config));
     iterConfig.xiaomi.inviteCode = currentRef;
     iterConfig.xiaomi.referralLink =
       `https://platform.xiaomimimo.com/?ref=${encodeURIComponent(currentRef)}`;
 
     const reg = new MimoRegistration(iterConfig);
-    let email = null, refCode = null, apiKey = null;
+    let refCode = null, apiKey = null;
     let currentProxy = null;
 
     try {
-      email = await reg.tempmail.createInbox();
-
       const fp = generateFingerprint();
       reg.fingerprint = fp;
 
@@ -145,22 +164,22 @@ class ChainRunner extends EventEmitter {
         return Buffer.alloc(0);
       };
 
+      // Navigate to referral link
       await reg.page.goto(iterConfig.xiaomi.referralLink, {
         waitUntil: 'networkidle', timeout: iterConfig.browser.timeout,
       });
 
-      await reg.fillRegistrationForm(email);
-      await reg.submitRegistration();
-      await reg.handleXiaomiCaptcha();
-      await reg.handleImageCaptcha();
-      await reg.verifyEmail(email);
+      // Google sign-in + Xiaomi onboarding
+      await reg.googleSignIn(account);
+      await reg.xiaomiOnboard();
 
+      // Post-registration
       try { await reg.redeemInviteCode(); } catch (e) {
         if (e.code === 'ACCOUNT_RESTRICTED' || e.code === 'BALANCE_NOT_CREDITED') throw e;
       }
 
       try { apiKey = await reg.createApiKey(); } catch (e) {}
-      try { await reg.fillUltraspeedForm(email); } catch (e) {}
+      try { await reg.fillUltraspeedForm(account.email); } catch (e) {}
 
       try {
         const captured = await reg.getReferralCode();
@@ -171,9 +190,9 @@ class ChainRunner extends EventEmitter {
         }
       } catch (e) {}
 
-      this._saveResult({ email, password: iterConfig.xiaomi.password, refCode, apiKey, invitedBy: currentRef });
+      this._saveResult({ email: account.email, password: account.password, refCode, apiKey, invitedBy: currentRef });
 
-      const result = { ok: true, idx, total, email, refCode, apiKey };
+      const result = { ok: true, idx, total, email: account.email, refCode, apiKey };
       this.emit('progress', result);
       return result;
 
@@ -182,10 +201,10 @@ class ChainRunner extends EventEmitter {
         this.proxyManager.reportFailure(currentProxy);
       }
 
-      this._logFailed(email, err.message);
+      this._logFailed(account.email, err.message);
 
       const result = {
-        ok: false, idx, total, email, error: err.message,
+        ok: false, idx, total, email: account.email, error: err.message,
         restricted: err.code === 'ACCOUNT_RESTRICTED' || err.code === 'BALANCE_NOT_CREDITED',
         stopReason: err.code,
       };

@@ -9,9 +9,9 @@
  */
 
 import { ChainRunner } from '../src/runner/chain-runner.js';
-import { config, count, seedRef, proxyManager } from './chain-loop-config.js';
+import { config, count, seedRef, proxyManager, emailList } from './chain-loop-config.js';
 
-const runner = new ChainRunner(config, proxyManager);
+const runner = new ChainRunner(config, proxyManager, undefined, emailList);
 
 // Forward events to console
 runner.on('start', ({ count, seedRef: ref }) => {

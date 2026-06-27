@@ -15,6 +15,7 @@ import { readFileSync, appendFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { ProxyManager } from '../src/browser/proxy.js';
+import { EmailList } from '../src/clients/email-list.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -42,6 +43,15 @@ const outputFile = outputIdx !== -1
   : join(outputDir, 'chain-result.txt');
 
 const failLog = join(outputDir, 'chain-fail.log');
+
+// ---- Email List -------------------------------------------------------
+
+const emailListPath = config.emailList?.filePath
+  ? join(__dirname, '..', config.emailList.filePath)
+  : join(__dirname, '..', 'config', 'emails.txt');
+
+const resultFilePath = join(outputDir, 'chain-result.txt');
+const emailList = new EmailList(emailListPath, resultFilePath);
 
 // ---- Proxy Manager ----------------------------------------------------
 
@@ -79,4 +89,4 @@ function logFail(email, error) {
   appendFileSync(failLog, line, 'utf8');
 }
 
-export { config, saveResult, logFail, count, seedRef, outputFile, failLog, proxyManager };
+export { config, saveResult, logFail, count, seedRef, outputFile, failLog, proxyManager, emailList };
